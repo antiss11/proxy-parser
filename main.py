@@ -5,8 +5,14 @@ from selenium.common.exceptions import NoSuchElementException
 
 PATTERN = "[0-9.]+$"
 PROXIES = 0
-URL = "https://hidemyna.me/en/proxy-list/?country=UA&start={0}#list".format(PROXIES)
-COUNTIES = {
+URL = ""
+COUNTRIES = {
+    "All": "ALADAOARAMAUATAZBDBYBEB" \
+    "JBOBABWBRBGBFBIKHCMCACLCOCGCDCRCIHRCYC" \
+    "ZDKDJDOECEGSVGQEEFIFRGEDEGHGRGTGNHTHNHKHUI" \
+    "NIDIQIEILITJMJPKZKEKRKWKGLALVLBLSLYLTLUMKMGMWMYMV" \
+    "MLMTMUMXMDMNMEMAMZMMNANPNLNZNINGNOPKPSPAPYPEPHPLPTPRROR" \
+    "URWMFRSSCSGSKSISOZAESLKSDSECHSYTWTJTZTHTGTRUGUAGBUSVEVNZMZW",
     "Argentina": "AR",
     "Albania": "AL",
     "Andorra": "AD",
@@ -148,8 +154,15 @@ COUNTIES = {
 class Parser:
 
     def __init__(self):
+        country = input("Enter country code from country dict or enter 2 or more codes like 'ARAL' or enter 'all': ").upper()
         self.browser = webdriver.Chrome()
         self.file = open("proxy.txt", "r+")
+        global URL
+        print(country)
+        if country == "ALL":
+            URL = "https://hidemyna.me/en/proxy-list/?country={0}&start={1}#list".format(COUNTRIES["All"], PROXIES)
+        else:
+            URL = "https://hidemyna.me/en/proxy-list/?country={0}&start={1}#list".format(country, PROXIES)
 
     def get_page(self, url):
         self.browser.get(url)
@@ -194,16 +207,16 @@ class Parser:
             return True
         else:
             return False
-
+        
     def page_changer(self):
-        global URL1
+        global URL
         global PROXIES
         PROXIES += 64
-        URL1 = "https://hidemyna.me/en/proxy-list/?country=UA&start={0}#list".format(PROXIES)
+        URL = "https://hidemyna.me/en/proxy-list/?country=UA&start={0}#list".format(PROXIES)
 
     def start(self):
         while True:
-            self.get_page(URL1)
+            self.get_page(URL)
             self.ddos_check()
             a.parse_page()
             proxy_end = self.check_page_proxy_end()
@@ -219,3 +232,5 @@ class Parser:
 if __name__ == "__main__":
     a = Parser()
     a.start()
+    # URL = "https://hidemyna.me/en/proxy-list/?country={0}&start={1}#list".format(COUNTRIES["All"], PROXIES)
+    # print(URL)
