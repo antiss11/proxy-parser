@@ -2,6 +2,13 @@ from bs4 import BeautifulSoup
 import time
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
+import gui
+import sys
+from PyQt5 import QtWidgets
+from PyQt5.Qt import QEvent, QWidget
+import threading
+from selenium.webdriver.chrome.options import Options
+
 
 PATTERN = "[0-9.]+$"
 PROXIES = 0
@@ -151,53 +158,41 @@ COUNTRIES = {
 }
 
 
-class Parser:
+class Parser(QtWidgets.QMainWindow, gui.Ui_MainWindow, QWidget):
 
     def __init__(self):
-        country = input("Enter country code from country dict or enter 2 or more codes like 'ARAL' or enter 'all': ").upper()
-        self.browser = webdriver.Chrome()
-        self.file = open("proxy.txt", "r+")
-        global URL
-        print(country)
-        if country == "ALL":
-            URL = "https://hidemyna.me/en/proxy-list/?country={0}&start={1}#list".format(COUNTRIES["All"], PROXIES)
-        else:
-            URL = "https://hidemyna.me/en/proxy-list/?country={0}&start={1}#list".format(country, PROXIES)
+        QWidget.__init__(self)
+        super().__init__(self)
+        self.setupUi(self)
+        self.comboBox_country.addItems(COUNTRIES)
+        self.pushButton_start.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        if obj == self.pushButton_start and event.type() == QEvent.MouseButtonPress:
+            self.pushButton_start.setDisabled(True)
+            self.start_button()
+        return QWidget.eventFilter(self, obj, event)
+
+    def closeEvent(self, *args, **kwargs):
+        if hasattr(Parser, "self.browser"):
+            self.close_browser()
+
+    def run_browser(self):
+        options = Options()
+        options.add_argument("--headless")
+        self.browser = webdriver.Chrome(options=options)
+
+    def close_browser(self):
+        self.browser.close()
 
     def get_page(self, url):
         self.browser.get(url)
-
-    def parse_page(self):
-        page = self.browser.page_source
-        soup = BeautifulSoup(page, features="lxml")
-        self.proxies = soup.findAll("td")
-        raw_list = []
-        for i in self.proxies:
-            raw_list.append(str(i.get_text()))
-        proxies = []
-        ports = []
-        num = 0
-        while True:
-            try:
-                proxy = raw_list[num]
-                num += 1
-                port = raw_list[num]
-                proxies.append(proxy)
-                ports.append(port)
-                num += 6
-            except IndexError:
-                break
-        self.proxy_list = [str(x[0]) + ":" + x[1] for x in zip(proxies, ports)]
-
-    def write_proxies(self):
-        for proxy in self.proxy_list:
-            self.file.write(proxy + "\n")
 
     def ddos_check(self):
         while True:
             try:
                 self.browser.find_element_by_css_selector("#cf-content")
-                time.sleep(0.5)
+                time.sleep(0.1)
             except NoSuchElementException:
                 break
 
@@ -207,30 +202,101 @@ class Parser:
             return True
         else:
             return False
-        
-    def page_changer(self):
-        global URL
-        global PROXIES
-        PROXIES += 64
-        URL = "https://hidemyna.me/en/proxy-list/?country=UA&start={0}#list".format(PROXIES)
 
     def start(self):
+        if hasattr(Parser, "self.file"):
+            self.writer = Writer(self.textBrowser, self.file)
+        else:
+            self.writer = Writer(self.textBrowser)
+        self.status = Status(self.label_status_text)
+        self.status.status("Running Chrome")
+        self.run_browser()
         while True:
+            self.status.status("Getting page")
             self.get_page(URL)
+            self.status.status("DDOS checking")
             self.ddos_check()
-            a.parse_page()
+            self.status.status("Page parsing")
+            self.proxy_list = parse_page(self.browser.page_source)
             proxy_end = self.check_page_proxy_end()
             if proxy_end is True:
-                print("Ready!")
+                self.status.status("Ready")
                 break
             else:
-                a.write_proxies()
-                a.page_changer()
-        self.browser.close()
+                for proxy in self.proxy_list:
+                    self.writer._write(proxy)
+                    time.sleep(0.001)
+                page_changer(self.country)
+        self.writer._close()
+        self.close_browser()
+        self.pushButton_start.setEnabled(True)
+
+    def start_button(self):
+        self.country = COUNTRIES[self.comboBox_country.currentText()]
+        global URL
+        URL = "https://hidemyna.me/en/proxy-list/?country={0}&start={1}#list".format(self.country, PROXIES)
+        if self.checkBox.isChecked():
+            self.file = "proxy.txt"
+        threading.Thread(target=self.start).start()
+
+
+class Writer:
+    def __init__(self, text_browser, file=None):
+        self.writer = text_browser
+        if file is not None:
+            self.file = open(file, "r+")
+
+    def _write(self, message):
+        self.writer.append(message)
+        if hasattr(Writer, "self.file"):
+            self.file.write(message + "\n")
+
+    def _close(self):
+        if hasattr(Writer, "self.file"):
+            self.file.close()
+
+
+class Status:
+    def __init__(self, status_obj):
+        self.obj = status_obj
+
+    def status(self, message):
+        self.obj.setText("")
+        self.obj.setText(message)
+
+
+def parse_page(page_source):
+    soup = BeautifulSoup(page_source, features="lxml")
+    proxies = soup.findAll("td")
+    raw_list = []
+    for proxy in proxies:
+        raw_list.append(str(proxy.get_text()))
+    proxies = []
+    ports = []
+    num = 0
+    while True:
+        try:
+            proxy = raw_list[num]
+            num += 1
+            port = raw_list[num]
+            proxies.append(proxy)
+            ports.append(port)
+            num += 6
+        except IndexError:
+            break
+    proxy_list = [str(x[0]) + ":" + x[1] for x in zip(proxies, ports)]
+    return proxy_list
+
+
+def page_changer(country):
+    global URL
+    global PROXIES
+    URL = "https://hidemyna.me/en/proxy-list/?country={0}&start={1}#list".format(country, PROXIES)
+    PROXIES += 64
 
 
 if __name__ == "__main__":
-    a = Parser()
-    a.start()
-    # URL = "https://hidemyna.me/en/proxy-list/?country={0}&start={1}#list".format(COUNTRIES["All"], PROXIES)
-    # print(URL)
+    app = QtWidgets.QApplication(sys.argv)
+    window = Parser()
+    window.show()
+    app.exec_()
