@@ -273,15 +273,15 @@ def parse_page(page_source):
         raw_list.append(str(proxy.get_text()))
     proxies = []
     ports = []
-    num = 0
+    col = 0
     while True:
         try:
-            proxy = raw_list[num]
-            num += 1
-            port = raw_list[num]
+            proxy = raw_list[col]
+            col += 1
+            port = raw_list[col]
             proxies.append(proxy)
             ports.append(port)
-            num += 6
+            col += 6
         except IndexError:
             break
     proxy_list = [str(x[0]) + ":" + x[1] for x in zip(proxies, ports)]
