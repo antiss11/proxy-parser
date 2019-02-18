@@ -171,7 +171,6 @@ class Parser(QtWidgets.QMainWindow, gui.Ui_MainWindow, QWidget):
     def eventFilter(self, obj, event):
         if obj == self.pushButton_start and event.type() == QEvent.MouseButtonPress and \
                 self.pushButton_start.isEnabled() is True:
-            self.textBrowser.clear()
             self.pushButton_start.setEnabled(False)
             self.start_button()
         if obj == self.pushButton_start and event.type() == QEvent.MouseButtonPress and \
