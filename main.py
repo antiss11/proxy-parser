@@ -13,6 +13,7 @@ from selenium.webdriver.chrome.options import Options
 PATTERN = "[0-9.]+$"
 PROXIES = 0
 URL = ""
+PROXIES_FILE = "proxy.txt"
 COUNTRIES = {
     "All": "ALADAOARAMAUATAZBDBYBEB" \
     "JBOBABWBRBGBFBIKHCMCACLCOCGCDCRCIHRCYC" \
@@ -168,12 +169,17 @@ class Parser(QtWidgets.QMainWindow, gui.Ui_MainWindow, QWidget):
         self.pushButton_start.installEventFilter(self)
 
     def eventFilter(self, obj, event):
-        if obj == self.pushButton_start and event.type() == QEvent.MouseButtonPress:
-            self.pushButton_start.setDisabled(True)
+        if obj == self.pushButton_start and event.type() == QEvent.MouseButtonPress and \
+                self.pushButton_start.isEnabled() is True:
+            self.textBrowser.clear()
+            self.pushButton_start.setEnabled(False)
             self.start_button()
+        if obj == self.pushButton_start and event.type() == QEvent.MouseButtonPress and \
+                self.pushButton_start.isEnabled() is False:
+            pass
         return QWidget.eventFilter(self, obj, event)
 
-    def closeEvent(self, *args, **kwargs):
+    def closeEvent(self):
         if hasattr(Parser, "self.browser"):
             self.close_browser()
 
@@ -203,10 +209,10 @@ class Parser(QtWidgets.QMainWindow, gui.Ui_MainWindow, QWidget):
         else:
             return False
 
-    def start(self):
-        if hasattr(Parser, "self.file"):
+    def start(self, file=None):
+        if file is not None:
             self.writer = Writer(self.textBrowser, self.file)
-        else:
+        elif file is None:
             self.writer = Writer(self.textBrowser)
         self.status = Status(self.label_status_text)
         self.status.status("Running Chrome")
@@ -223,9 +229,11 @@ class Parser(QtWidgets.QMainWindow, gui.Ui_MainWindow, QWidget):
                 self.status.status("Ready")
                 break
             else:
-                for proxy in self.proxy_list:
-                    self.writer._write(proxy)
-                    time.sleep(0.001)
+                for i in self.proxy_list:
+                    param = i.split(":")
+                    proxy, port, type = param[0], param[1], param[2]
+                    self.writer._write(proxy, port, type)
+                    time.sleep(0.01)
                 page_changer(self.country)
         self.writer._close()
         self.close_browser()
@@ -236,8 +244,10 @@ class Parser(QtWidgets.QMainWindow, gui.Ui_MainWindow, QWidget):
         global URL
         URL = "https://hidemyna.me/en/proxy-list/?country={0}&start={1}#list".format(self.country, PROXIES)
         if self.checkBox.isChecked():
-            self.file = "proxy.txt"
-        threading.Thread(target=self.start).start()
+            self.file = PROXIES_FILE
+            threading.Thread(target=self.start, args=(self.file,)).start()
+        elif not self.checkBox.isChecked():
+            threading.Thread(target=self.start).start()
 
 
 class Writer:
@@ -246,15 +256,19 @@ class Writer:
         if file is not None:
             self.file = open(file, "r+")
 
-    def _write(self, message):
-        self.writer.append(message)
-        if hasattr(Writer, "self.file"):
-            self.file.write(message + "\n")
+    def _write(self, proxy=None, port=None, type=None):
+        if proxy is not None and port is not None and type is not None:
+            self.writer.append('{0}:{1} \t {2:>8}'.format(proxy, port, type))
+            try:
+                self.file.write('{0}:{1};{2}\n'.format(proxy, port, type))
+            except AttributeError:
+                pass
 
     def _close(self):
-        if hasattr(Writer, "self.file"):
+        try:
             self.file.close()
-
+        except AttributeError:
+            pass
 
 class Status:
     def __init__(self, status_obj):
@@ -273,26 +287,30 @@ def parse_page(page_source):
         raw_list.append(str(proxy.get_text()))
     proxies = []
     ports = []
+    types = []
     col = 0
     while True:
         try:
             proxy = raw_list[col]
             col += 1
             port = raw_list[col]
+            col += 3
+            type = raw_list[col]
             proxies.append(proxy)
             ports.append(port)
-            col += 6
+            types.append(type)
+            col += 3
         except IndexError:
             break
-    proxy_list = [str(x[0]) + ":" + x[1] for x in zip(proxies, ports)]
+    proxy_list = [x[0] + ":" + x[1] + ":" + x[2] for x in zip(proxies, ports, types)]
     return proxy_list
 
 
 def page_changer(country):
     global URL
     global PROXIES
-    URL = "https://hidemyna.me/en/proxy-list/?country={0}&start={1}#list".format(country, PROXIES)
     PROXIES += 64
+    URL = "https://hidemyna.me/en/proxy-list/?country={0}&start={1}#list".format(country, PROXIES)
 
 
 if __name__ == "__main__":
